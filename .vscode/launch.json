@@ -1,0 +1,20 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "cwd": "${workspaceFolder}/00_degrees",
+            "args": ["small", "<", "stdin"]
+        },{
+            "name": "tictactoe",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "main.py",
+            "cwd": "${workspaceFolder}/00_tictactoe",
+            "python": "${command:python.interpreterPath}"
+        }
+    ]
+}
