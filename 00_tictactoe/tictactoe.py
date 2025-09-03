@@ -137,7 +137,6 @@ def minimax(board, depth=1):
     """
     Returns the optimal action for the current player on the board.
     """
-    play= player(board)
     if terminal(board):
         return None
 
@@ -147,8 +146,6 @@ def minimax(board, depth=1):
     if player(board) == X:
         max = -10
         for action in acts:
-            # new_board = result(board,action)
-            # mm = minimax(new_board, depth+1) # Get the other player's best movement
             other_player_util = minimax_score(result(board,action), depth+1) # Get the greatest utility
 
             # If i found an action that maximizes utility
@@ -160,8 +157,6 @@ def minimax(board, depth=1):
     else:
         min = 10
         for action in acts:
-            # new_board = result(board,action)
-            # mm = minimax(new_board, depth+1)
             other_player_util = minimax_score(result(board,action), depth+1) # Get the greatest utility
 
             if other_player_util < min:
