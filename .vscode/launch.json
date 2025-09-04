@@ -15,6 +15,13 @@
             "program": "main.py",
             "cwd": "${workspaceFolder}/00_tictactoe",
             "python": "${command:python.interpreterPath}"
+        },{
+            "name": "minesweeper",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "main.py",
+            "cwd": "${workspaceFolder}/01_minesweeper",
+            "python": "${command:python.interpreterPath}"
         }
     ]
 }
