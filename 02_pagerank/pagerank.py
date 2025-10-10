@@ -108,9 +108,11 @@ def sample_pagerank(corpus, damping_factor, n):
 
     return { page: count / n for page, count in ranks.items() }
 
-def page_backlinks(corpus):
+def compute_backlinks(corpus):
     backlinks = {page: set() for page in corpus}
     for page in corpus:
+        # If page contains no outgoing links then we interpret it
+        # as if we were linking to all pages 
         if len(corpus[page]) == 0:
             corpus[page] = set(corpus.keys())
         for link in corpus[page]:
@@ -133,21 +135,20 @@ def iterate_pagerank(corpus, damping_factor):
     their estimated PageRank value (a value between 0 and 1). All
     PageRank values should sum to 1.
     """
-    backlinks = page_backlinks(corpus)
+    backlinks = compute_backlinks(corpus)
 
     # The function should begin by assigning each page a rank of 1 / N, where N is the total number of pages in the corpus.
     ranks = {page: 1 / len(corpus) for page in corpus}
     k = (1 - damping_factor) / len(corpus)
 
     while True:
-        new_ranks = copy.deepcopy(ranks)
+        # The function should then repeatedly calculate new rank values based on all of the current rank values, according to the PageRank formula
+        new_ranks = {}
         for page in corpus:
-            # The function should then repeatedly calculate new rank values based on all of the current rank values, according to the PageRank formula
-            backlinks_sum = 0
-            for backlink in page_backlinks(corpus)[page]:
-                # A page that has no links at all should be interpreted as having one link for every page in the corpus (including itself)
-                length = min(len(corpus[backlink]), len(corpus))
-                backlinks_sum = backlinks_sum + (ranks[backlink] / length)
+            backlinks_sum = sum(
+                ranks[backlink] / len(corpus[backlink])
+                 for backlink in backlinks[page]
+            )
 
             new_ranks[page] = k + damping_factor * backlinks_sum 
 
