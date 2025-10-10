@@ -71,22 +71,17 @@ def transition_model(corpus, page, damping_factor):
     linked to by `page`. With probability `1 - damping_factor`, choose
     a link at random chosen from all pages in the corpus.
     """
-    model = dict()
+    # Probability of choosing a random page in the corpus
+    model = {p: (1 - damping_factor) / len(corpus) for p in corpus}
     page_links = corpus.get(page, set())
 
     # If current page has no outgoing links then every page gets an equal prob
     if len(page_links) == 0:
-        for curr_page in corpus:
-            model[curr_page] = 1 / len(corpus)
         return model
-
-    # Probability of choosing a random page in the corpus
-    for curr_page in corpus:
-        model[curr_page] = (1 - damping_factor) / len(corpus)
 
     for link in page_links:
         # Probability of chossing one of the pages linked by current page
-        model[link] = model.get(link,0) + damping_factor * (1 / len(page_links))
+        model[link] += damping_factor / len(page_links)
     
     return model
 
@@ -101,32 +96,26 @@ def sample_pagerank(corpus, damping_factor, n):
     PageRank values should sum to 1.
     """
 
-    ranks = dict()
-    page = random.randint(0, len(corpus))
-    ranks[page] = 1
+    # This algorithm works by sampling pages and counting how many times they appear in the final result
+    ranks ={ page: 0 for page in corpus } 
+    page = random.choice(list(corpus))  # random page
 
     for _ in range(n):
-        model = transition_model(corpus, page, DAMPING)
+        ranks[page] += 1
+        model = transition_model(corpus, page, damping_factor)
         page = random.choices(list(model.keys()), [ p * 100 for p in list(model.values())])[0]
-        ranks[page] = ranks.get(page, 0) + 1
+        # page = random.choices(list(model.keys()), weights=model.values(), k=1)[0] # select a new page randomly
 
-    for page in ranks:
-        ranks[page] = ranks[page] / n
+    return { page: count / n for page, count in ranks.items() }
 
-    return ranks
-
-BACKLINKS = dict()
-def page_backlinks(corpus, p):
-    if len(BACKLINKS) == 0:
-        for page in corpus:
-            if len(corpus[page]) == 0:
-                corpus[page] = set(corpus.keys())
-            for link in corpus[page]:
-                backlinks = BACKLINKS.get(link,set())
-                backlinks.add(page)
-                BACKLINKS[link]  = backlinks
-
-    return BACKLINKS.get(p, set())
+def page_backlinks(corpus):
+    backlinks = {page: set() for page in corpus}
+    for page in corpus:
+        if len(corpus[page]) == 0:
+            corpus[page] = set(corpus.keys())
+        for link in corpus[page]:
+            backlinks[link].add(page)
+    return backlinks
 
 def should_stop(ranks1, ranks2):
     v1s = list(ranks1.values())
@@ -145,6 +134,7 @@ def iterate_pagerank(corpus, damping_factor):
     PageRank values should sum to 1.
     """
     ranks = dict()
+    backlinks = page_backlinks(corpus)
 
     # The function should begin by assigning each page a rank of 1 / N, where N is the total number of pages in the corpus.
     for page in corpus:
@@ -156,7 +146,7 @@ def iterate_pagerank(corpus, damping_factor):
         for page in corpus:
             # The function should then repeatedly calculate new rank values based on all of the current rank values, according to the PageRank formula
             backlinks_sum = 0
-            for backlink in page_backlinks(corpus, page):
+            for backlink in page_backlinks(corpus)[page]:
                 # A page that has no links at all should be interpreted as having one link for every page in the corpus (including itself)
                 length = min(len(corpus[backlink]), len(corpus))
                 backlinks_sum = backlinks_sum + (ranks[backlink] / length)
