@@ -133,12 +133,10 @@ def iterate_pagerank(corpus, damping_factor):
     their estimated PageRank value (a value between 0 and 1). All
     PageRank values should sum to 1.
     """
-    ranks = dict()
     backlinks = page_backlinks(corpus)
 
     # The function should begin by assigning each page a rank of 1 / N, where N is the total number of pages in the corpus.
-    for page in corpus:
-        ranks[page] = 1 / len(corpus)
+    ranks = {page: 1 / len(corpus) for page in corpus}
     k = (1 - damping_factor) / len(corpus)
 
     while True:
@@ -153,12 +151,10 @@ def iterate_pagerank(corpus, damping_factor):
 
             new_ranks[page] = k + damping_factor * backlinks_sum 
 
-        else:
-            # return of none of the values changed more than 0.001
-            if should_stop(ranks, new_ranks):
-                return new_ranks
-            else:
-                ranks = new_ranks
+        # Check for convergence
+        if all(abs(new_ranks[page] - ranks[page]) < 0.001 for page in ranks):
+            return new_ranks
+        ranks = new_ranks
 
 
 
