@@ -127,6 +127,26 @@ def person_gene_count(person, one_gene, two_genes):
     return 0
 
 
+# Probabilties of inheriting 1 gene
+inherit_gen_prob = {0: PROBS["mutation"], 1: 0.5, 2: 1 - PROBS["mutation"]}
+
+
+# Probabilites of inheriting a specific `gene_countz
+def gene_count_inherit(gene_count, father_prob, mother_prob):
+    match gene_count:
+        # Both parents give you one gene
+        case 2:
+            return mother_prob * father_prob
+        # Only one of your parents gives a gene
+        case 1:
+            return (1 - mother_prob) * father_prob + mother_prob * (1 - father_prob)
+        # No parents give a gene
+        case 0:
+            return (1 - mother_prob) * (1 - father_prob)
+    assert (False, "Shouldn't get here")  # noqa: F631
+    return 0  # should not happen
+
+
 def joint_probability(people, one_gene, two_genes, have_trait):
     """
     Compute and return a joint probability.
@@ -147,44 +167,13 @@ def joint_probability(people, one_gene, two_genes, have_trait):
             gene_prob = PROBS["gene"][gene_count]
 
         else:
-            # If a parent has two copies of the mutated gene, then they will pass the mutated gene on to the child;
-            # if a parent has no copies of the mutated gene, then they will not pass the mutated gene on
-            # to the child; and if a parent has one copy of the mutated gene, then the gene is passed on to the child
-            # with probability 0.5. After a gene is passed on, though, it has some probability of undergoing
-            # additional mutation: changing from a version of the gene that causes hearing impairment to a
-            # version that doesn’t, or vice versa.
-            gcm = person_gene_count(people[person]["mother"], one_gene, two_genes)
-
-            if gcm == 0:
-                prob_mother_giving_gen = PROBS["mutation"]
-            elif gcm == 1:
-                prob_mother_giving_gen = 0.5
-            else:
-                prob_mother_giving_gen = 1 - PROBS["mutation"]
-
-            p_M = prob_mother_giving_gen
-
-            gcf = person_gene_count(people[person]["father"], one_gene, two_genes)
-
-            if gcf == 0:
-                prob_father_giving_gen = PROBS["mutation"]
-            elif gcf == 1:
-                prob_father_giving_gen = 0.5
-            else:
-                prob_father_giving_gen = 1 - PROBS["mutation"]
-
-            p_F = prob_father_giving_gen
-
-            match gene_count:
-                # Both parents give you one gene
-                case 2:
-                    gene_prob = p_M * p_F
-                # Only one of your parents gives a gene
-                case 1:
-                    gene_prob = (1 - p_M) * p_F + p_M * (1 - p_F)
-                # No parents give a gene
-                case 0:
-                    gene_prob = (1 - p_M) * (1 - p_F)
+            prob_mother = inherit_gen_prob[
+                person_gene_count(people[person]["mother"], one_gene, two_genes)
+            ]
+            prob_father = inherit_gen_prob[
+                person_gene_count(people[person]["father"], one_gene, two_genes)
+            ]
+            gene_prob = gene_count_inherit(gene_count, prob_father, prob_mother)
 
         # prob of having `gene_count` and `have_trait`
         prob *= gene_prob * PROBS["trait"][gene_count][person in have_trait]
