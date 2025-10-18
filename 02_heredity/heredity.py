@@ -18,65 +18,57 @@ PROBS = {
 }
 
 
-# trait = false, gene_count = 0
-## James
-#  pJ = 0.96 (gene) * 0.99 (trait)
-#  pL = 0.96 (gene) * 0.99 (trait)
-#  pH = 0.01 * 0.96 + 0.01 * 0.96
-
-# total =
-
-
 def main():
-    fam = {
-        "Harry": {"name": "Harry", "mother": "Lily", "father": "James", "trait": None},
-        "James": {"name": "James", "mother": None, "father": None, "trait": None},
-        "Lily": {"name": "Lily", "mother": None, "father": None, "trait": None},
-    }
-    joint_probability(fam, set(), set(), set())
-    # Check for proper usage
-    # if len(sys.argv) != 2:
-    #     sys.exit("Usage: python heredity.py data.csv")
-    # people = load_data(sys.argv[1])
-    #
-    # # Keep track of gene and trait probabilities for each person
-    # probabilities = {
-    #     person: {"gene": {2: 0, 1: 0, 0: 0}, "trait": {True: 0, False: 0}}
-    #     for person in people
+    # fam = {
+    #     "Harry": {"name": "Harry", "mother": "Lily", "father": "James", "trait": None},
+    #     "James": {"name": "James", "mother": None, "father": None, "trait": None},
+    #     "Lily": {"name": "Lily", "mother": None, "father": None, "trait": None},
     # }
-    #
-    # # Loop over all sets of people who might have the trait
-    # names = set(people)
-    # for have_trait in powerset(names):
-    #     # Check if current set of people violates known information
-    #     fails_evidence = any(
-    #         (
-    #             people[person]["trait"] is not None
-    #             and people[person]["trait"] != (person in have_trait)
-    #         )
-    #         for person in names
-    #     )
-    #     if fails_evidence:
-    #         continue
-    #
-    #     # Loop over all sets of people who might have the gene
-    #     for one_gene in powerset(names):
-    #         for two_genes in powerset(names - one_gene):
-    #             # Update probabilities with new joint probability
-    #             p = joint_probability(people, one_gene, two_genes, have_trait)
-    #             update(probabilities, one_gene, two_genes, have_trait, p)
-    #
-    # # Ensure probabilities sum to 1
-    # normalize(probabilities)
-    #
-    # # Print results
-    # for person in people:
-    #     print(f"{person}:")
-    #     for field in probabilities[person]:
-    #         print(f"  {field.capitalize()}:")
-    #         for value in probabilities[person][field]:
-    #             p = probabilities[person][field][value]
-    #             print(f"    {value}: {p:.4f}")
+    # joint_probability(fam, set(), set(), set())
+
+    # Check for proper usage
+    if len(sys.argv) != 2:
+        sys.exit("Usage: python heredity.py data.csv")
+    people = load_data(sys.argv[1])
+
+    # Keep track of gene and trait probabilities for each person
+    probabilities = {
+        person: {"gene": {2: 0, 1: 0, 0: 0}, "trait": {True: 0, False: 0}}
+        for person in people
+    }
+
+    # Loop over all sets of people who might have the trait
+    names = set(people)
+    for have_trait in powerset(names):
+        # Check if current set of people violates known information
+        fails_evidence = any(
+            (
+                people[person]["trait"] is not None
+                and people[person]["trait"] != (person in have_trait)
+            )
+            for person in names
+        )
+        if fails_evidence:
+            continue
+
+        # Loop over all sets of people who might have the gene
+        for one_gene in powerset(names):
+            for two_genes in powerset(names - one_gene):
+                # Update probabilities with new joint probability
+                p = joint_probability(people, one_gene, two_genes, have_trait)
+                update(probabilities, one_gene, two_genes, have_trait, p)
+
+    # Ensure probabilities sum to 1
+    normalize(probabilities)
+
+    # Print results
+    for person in people:
+        print(f"{person}:")
+        for field in probabilities[person]:
+            print(f"  {field.capitalize()}:")
+            for value in probabilities[person][field]:
+                p = probabilities[person][field][value]
+                print(f"    {value}: {p:.4f}")
 
 
 def load_data(filename):
@@ -162,16 +154,18 @@ def joint_probability(people, one_gene, two_genes, have_trait):
     prob = 1
     for person in people:
         gene_count = person_gene_count(person, one_gene, two_genes)
+        mother = people[person]["mother"]
+        father = people[person]["father"]
 
-        if people[person]["mother"] is None or people[person]["father"] is None:
+        if mother is None or father is None:
             gene_prob = PROBS["gene"][gene_count]
 
         else:
             prob_mother = inherit_gen_prob[
-                person_gene_count(people[person]["mother"], one_gene, two_genes)
+                person_gene_count(mother, one_gene, two_genes)
             ]
             prob_father = inherit_gen_prob[
-                person_gene_count(people[person]["father"], one_gene, two_genes)
+                person_gene_count(father, one_gene, two_genes)
             ]
             gene_prob = gene_count_inherit(gene_count, prob_father, prob_mother)
 
@@ -188,7 +182,16 @@ def update(probabilities, one_gene, two_genes, have_trait, p):
     Which value for each distribution is updated depends on whether
     the person is in `have_gene` and `have_trait`, respectively.
     """
-    raise NotImplementedError
+
+    for person in probabilities:
+        gene_count = person_gene_count(person, one_gene, two_genes)
+
+        probabilities[person]["gene"][gene_count] = (
+            probabilities[person]["gene"][gene_count] + p
+        )
+        probabilities[person]["trait"][person in have_trait] = (
+            probabilities[person]["trait"][person in have_trait] + p
+        )
 
 
 def normalize(probabilities):
@@ -196,7 +199,22 @@ def normalize(probabilities):
     Update `probabilities` such that each probability distribution
     is normalized (i.e., sums to 1, with relative proportions the same).
     """
-    raise NotImplementedError
+    for person in probabilities:
+        # {2: 0.1, 1: 0.3, 0: 0.1}
+        # 0.1 x + 0.3x + 0.1X = 1
+        # 0.8x = 1
+        # x = 1 / 0.5
+        # x = 2
+
+        probabilities[person]["gene"] = {
+            key: value * 1 / sum(probabilities[person]["gene"].values())
+            for (key, value) in probabilities[person]["gene"].items()
+        }
+
+        probabilities[person]["trait"] = {
+            key: value * 1 / sum(probabilities[person]["trait"].values())
+            for (key, value) in probabilities[person]["trait"].items()
+        }
 
 
 if __name__ == "__main__":
