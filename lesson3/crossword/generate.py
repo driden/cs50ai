@@ -106,17 +106,6 @@ class CrosswordCreator:
             for variable, values in self.domains.items()
         }
 
-    def get_overlap_index(self, variable, overlap):
-        index = -1
-        if not overlap:
-            return index
-
-        for coords in variable.cells:
-            index += 1
-            if coords == overlap:
-                return index
-        return index
-
     def revise(self, x, y):
         """
         Make variable `x` arc consistent with variable `y`.
@@ -127,25 +116,18 @@ class CrosswordCreator:
         False if no revision was made.
         """
         overlap = self.crossword.overlaps[x, y]
-        x_index = self.get_overlap_index(x, overlap)
-        y_index = self.get_overlap_index(y, overlap)
-        print(f"\n{x=},\n{y=}")
-        print(f"{overlap=}")
-        print(f"{x_index=},{y_index=}\n")
 
-        # x=Variable(0, 1, 'across', 5),
-        # y=Variable(0, 2, 'down', 3)
-        # overlap=(1, 0)
-        # x_index=4,y_index=2
+        if not overlap:
+            return
 
-        # for value_x in self.domains[x]:
-        #     overlap = self.crossword.overlaps[(x, y)]
-        #     if x.direction == "across":
-        #         x_index = x.length - x.i - 1
-        #     else:
-        #         x_index = x.length - x.j - 1
+        i = overlap[0]
+        j = overlap[1]
 
-        raise NotImplementedError
+        self.domains[x] = {
+            wordx
+            for wordx in self.domains[x]
+            if any([wordx[i] == wordy[j] for wordy in self.domains[y]])
+        }
 
     def ac3(self, arcs=None):
         """
@@ -228,12 +210,11 @@ def main():
 
     x = Variable(0, 1, "across", 5)
     y = Variable(0, 2, "down", 3)
+    crossword = Crossword("data/test_structure0.txt", "data/test_words1.txt")
+    creator = CrosswordCreator(crossword)
 
-    n = 5
-    crossword = [[0] * n for _ in range(n)]
-
-    for i in range(n):
-        for j in range(n):
+    for i in range(crossword.height):
+        for j in range(crossword.width):
             # if (i, j) == overlap:
             #     print("o", end="")
             if (i, j) in x.cells and (i, j) in y.cells:
@@ -248,6 +229,7 @@ def main():
         print("")
 
     print(f"{overlap=}")
+    print(f"{crossword.overlaps[x,y]=}")
 
 
 if __name__ == "__main__":
