@@ -1,6 +1,7 @@
 import sys
 
 from crossword import *
+import queue as q
 
 
 class CrosswordCreator:
@@ -106,7 +107,7 @@ class CrosswordCreator:
             for variable, values in self.domains.items()
         }
 
-    def revise(self, x, y):
+    def revise(self, x: Variable, y: Variable):
         """
         Make variable `x` arc consistent with variable `y`.
         To do so, remove values from `self.domains[x]` for which there is no
@@ -123,11 +124,14 @@ class CrosswordCreator:
         i = overlap[0]
         j = overlap[1]
 
+        previous_length = len(self.domains[x])
         self.domains[x] = {
             wordx
             for wordx in self.domains[x]
             if any([wordx[i] == wordy[j] for wordy in self.domains[y]])
         }
+
+        return previous_length != len(self.domains[x])
 
     def ac3(self, arcs=None):
         """
@@ -138,7 +142,29 @@ class CrosswordCreator:
         Return True if arc consistency is enforced and no domains are empty;
         return False if one or more domains end up empty.
         """
-        raise NotImplementedError
+        queue = q.Queue()
+
+        if not arcs or len(arcs) == 0:
+            # need to use all
+            for var1 in self.domains.keys():
+                for var2 in self.domains.keys():
+                    if var1 != var2:
+                        queue.put((var1, var2))
+        else:
+            # use arcs passed in
+            for arc in arcs:
+                queue.put(arc)
+
+        while queue.qsize() > 0:
+            x, y = queue.get()
+
+            if self.revise(x, y):
+                if len(self.domains[x]) == 0:
+                    return False
+
+                for neighbor in self.crossword.neighbors(x) - {y}:
+                    queue.put((neighbor, x))
+        return True
 
     def assignment_complete(self, assignment):
         """
@@ -208,28 +234,34 @@ def main():
     #     if output:
     #         creator.save(assignment, output)
 
-    x = Variable(0, 1, "across", 5)
-    y = Variable(0, 2, "down", 3)
     crossword = Crossword("data/test_structure0.txt", "data/test_words1.txt")
     creator = CrosswordCreator(crossword)
+    creator.domains = {
+        Variable(0, 1, "across", 5): {"TODAY", "READY", "HELLO", "AMAZE", "FORGE"},
+        Variable(0, 2, "down", 3): {"ODE", "ELM"},
+        Variable(2, 1, "across", 5): {"TODAY", "READY", "HELLO", "AMAZE", "FORGE"},
+    }
 
-    for i in range(crossword.height):
-        for j in range(crossword.width):
-            # if (i, j) == overlap:
-            #     print("o", end="")
-            if (i, j) in x.cells and (i, j) in y.cells:
-                print("@", end="")
-                overlap = i, j
-            elif (i, j) in x.cells:
-                print("x", end="")
-            elif (i, j) in y.cells:
-                print("y", end="")
-            else:
-                print("_", end="")
-        print("")
+    creator.ac3(arcs=[])
 
-    print(f"{overlap=}")
-    print(f"{crossword.overlaps[x,y]=}")
+    # x = Variable(0, 1, "across", 5)
+    # y = Variable(0, 2, "down", 3)
+    # for i in range(crossword.height):
+    #     for j in range(crossword.width):
+    #         # if (i, j) == overlap:
+    #         #     print("o", end="")
+    #         if (i, j) in x.cells and (i, j) in y.cells:
+    #             print("@", end="")
+    #             overlap = i, j
+    #         elif (i, j) in x.cells:
+    #             print("x", end="")
+    #         elif (i, j) in y.cells:
+    #             print("y", end="")
+    #         else:
+    #             print("_", end="")
+    #     print("")
+    #
+    # print(f"{crossword.overlaps[x,y]=}")
 
 
 if __name__ == "__main__":
