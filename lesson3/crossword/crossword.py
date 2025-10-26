@@ -1,5 +1,4 @@
-class Variable():
-
+class Variable:
     ACROSS = "across"
     DOWN = "down"
 
@@ -9,11 +8,13 @@ class Variable():
         self.j = j
         self.direction = direction
         self.length = length
-        self.cells = []
+        self.cells: list[tuple[int, int]] = []
         for k in range(self.length):
             self.cells.append(
-                (self.i + (k if self.direction == Variable.DOWN else 0),
-                 self.j + (k if self.direction == Variable.ACROSS else 0))
+                (
+                    self.i + (k if self.direction == Variable.DOWN else 0),
+                    self.j + (k if self.direction == Variable.ACROSS else 0),
+                )
             )
 
     def __hash__(self):
@@ -21,10 +22,10 @@ class Variable():
 
     def __eq__(self, other):
         return (
-            (self.i == other.i) and
-            (self.j == other.j) and
-            (self.direction == other.direction) and
-            (self.length == other.length)
+            (self.i == other.i)
+            and (self.j == other.j)
+            and (self.direction == other.direction)
+            and (self.length == other.length)
         )
 
     def __str__(self):
@@ -35,10 +36,8 @@ class Variable():
         return f"Variable({self.i}, {self.j}, {direction}, {self.length})"
 
 
-class Crossword():
-
+class Crossword:
     def __init__(self, structure_file, words_file):
-
         # Determine structure of crossword
         with open(structure_file) as f:
             contents = f.read().splitlines()
@@ -62,14 +61,12 @@ class Crossword():
             self.words = set(f.read().upper().splitlines())
 
         # Determine variable set
-        self.variables = set()
+        self.variables: set[Variable] = set()
         for i in range(self.height):
             for j in range(self.width):
-
                 # Vertical words
-                starts_word = (
-                    self.structure[i][j]
-                    and (i == 0 or not self.structure[i - 1][j])
+                starts_word = self.structure[i][j] and (
+                    i == 0 or not self.structure[i - 1][j]
                 )
                 if starts_word:
                     length = 1
@@ -79,16 +76,13 @@ class Crossword():
                         else:
                             break
                     if length > 1:
-                        self.variables.add(Variable(
-                            i=i, j=j,
-                            direction=Variable.DOWN,
-                            length=length
-                        ))
+                        self.variables.add(
+                            Variable(i=i, j=j, direction=Variable.DOWN, length=length)
+                        )
 
                 # Horizontal words
-                starts_word = (
-                    self.structure[i][j]
-                    and (j == 0 or not self.structure[i][j - 1])
+                starts_word = self.structure[i][j] and (
+                    j == 0 or not self.structure[i][j - 1]
                 )
                 if starts_word:
                     length = 1
@@ -98,17 +92,15 @@ class Crossword():
                         else:
                             break
                     if length > 1:
-                        self.variables.add(Variable(
-                            i=i, j=j,
-                            direction=Variable.ACROSS,
-                            length=length
-                        ))
+                        self.variables.add(
+                            Variable(i=i, j=j, direction=Variable.ACROSS, length=length)
+                        )
 
         # Compute overlaps for each word
         # For any pair of variables v1, v2, their overlap is either:
         #    None, if the two variables do not overlap; or
         #    (i, j), where v1's ith character overlaps v2's jth character
-        self.overlaps = dict()
+        self.overlaps: dict[tuple[Variable, Variable], tuple[int, int] | None] = dict()
         for v1 in self.variables:
             for v2 in self.variables:
                 if v1 == v2:
@@ -122,12 +114,9 @@ class Crossword():
                     intersection = intersection.pop()
                     self.overlaps[v1, v2] = (
                         cells1.index(intersection),
-                        cells2.index(intersection)
+                        cells2.index(intersection),
                     )
 
-    def neighbors(self, var):
+    def neighbors(self, var) -> set[Variable]:
         """Given a variable, return set of overlapping variables."""
-        return set(
-            v for v in self.variables
-            if v != var and self.overlaps[v, var]
-        )
+        return set(v for v in self.variables if v != var and self.overlaps[v, var])

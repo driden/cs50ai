@@ -2,7 +2,8 @@ import sys
 
 from crossword import *
 from copy import deepcopy
-import queue as q
+
+Arc = tuple[Variable, Variable]
 
 
 class CrosswordCreator:
@@ -10,8 +11,8 @@ class CrosswordCreator:
         """
         Create new CSP crossword generate.
         """
-        self.crossword = crossword
-        self.domains = {
+        self.crossword: Crossword = crossword
+        self.domains: dict[Variable, set[str]] = {
             var: self.crossword.words.copy() for var in self.crossword.variables
         }
 
@@ -117,13 +118,13 @@ class CrosswordCreator:
         Return True if a revision was made to the domain of `x`; return
         False if no revision was made.
         """
+
         overlap = self.crossword.overlaps[x, y]
 
-        if not overlap:
-            return
+        if overlap is None:
+            return False
 
-        i = overlap[0]
-        j = overlap[1]
+        i, j = overlap
 
         previous_length = len(self.domains[x])
         self.domains[x] = {
@@ -134,7 +135,7 @@ class CrosswordCreator:
 
         return previous_length != len(self.domains[x])
 
-    def ac3(self, arcs=None):
+    def ac3(self, arcs: list[Arc] | None = None):
         """
         Update `self.domains` such that each variable is arc consistent.
         If `arcs` is None, begin with initial list of all arcs in the problem.
@@ -143,31 +144,26 @@ class CrosswordCreator:
         Return True if arc consistency is enforced and no domains are empty;
         return False if one or more domains end up empty.
         """
-        queue = q.Queue()
 
-        if not arcs or len(arcs) == 0:
-            # need to use all
-            for var1 in self.domains.keys():
-                for var2 in self.domains.keys():
-                    if var1 != var2:
-                        queue.put((var1, var2))
-        else:
-            # use arcs passed in
-            for arc in arcs:
-                queue.put(arc)
+        if arcs is None:
+            arcs = [
+                (x, y)
+                for x in self.crossword.variables
+                for y in self.crossword.neighbors(x)
+            ]
 
-        while queue.qsize() > 0:
-            x, y = queue.get()
+        while len(arcs) > 0:
+            x, y = arcs.pop()
 
             if self.revise(x, y):
                 if len(self.domains[x]) == 0:
                     return False
 
                 for neighbor in self.crossword.neighbors(x) - {y}:
-                    queue.put((neighbor, x))
+                    arcs.append((neighbor, x))
         return True
 
-    def assignment_complete(self, assignment: dict[Variable, str]):
+    def assignment_complete(self, assignment: dict[Variable, str]) -> bool:
         """
         Return True if `assignment` is complete (i.e., assigns a value to each
         crossword variable); return False otherwise.
@@ -176,7 +172,11 @@ class CrosswordCreator:
         return len(self.domains) == len(assignment)
 
     def overlap_satisfied(
-        self, assignment: dict[Variable, str], var: Variable, neighbor: Variable
+        self,
+        var: Variable,
+        neighbor: Variable,
+        var_value: str,
+        neighbor_value: str,
     ):
         # If no overlap, no arc consistency to satisfy
         if not self.crossword.overlaps[var, neighbor]:
@@ -184,11 +184,11 @@ class CrosswordCreator:
 
         # Otherwise check that letters match at overlapping indices
         else:
-            var_value = assignment[var]
-            neighbor_value = assignment[neighbor]
-            x, y = self.crossword.overlaps[var, neighbor]  # Their indices
+            iter = self.crossword.overlaps[var, neighbor]  # Their indices
 
-            return var_value[x] == neighbor_value[y]
+            if iter:
+                x, y = iter
+                return var_value[x] == neighbor_value[y]
 
     def consistent(self, assignment: dict[Variable, str]):
         """
@@ -212,14 +212,17 @@ class CrosswordCreator:
             # Check if there are conflicts between neighboring variables:
             for neighbor in self.crossword.neighbors(var):
                 if neighbor in assignment:
+                    neighbor_val = assignment[neighbor]
                     # Check if neighbor variable is assigned and satisfies constraints
-                    if not self.overlap_satisfied(assignment, var, neighbor):
+                    if not self.overlap_satisfied(var, neighbor, val, neighbor_val):
                         return False
 
         # Otherwise all assignments are consistent
         return True
 
-    def order_domain_values(self, var: Variable, assignment: dict[Variable, str]):
+    def order_domain_values(
+        self, var: Variable, assignment: dict[Variable, str]
+    ) -> list[str]:
         """
         Return a list of values in the domain of `var`, in order by
         the number of values they rule out for neighboring variables.
@@ -231,12 +234,9 @@ class CrosswordCreator:
 
         for val in self.domains[var]:
             for neighbor in self.crossword.neighbors(var):
-                if (
-                    var in assignment
-                    and neighbor in assignment
-                    and not self.overlap_satisfied(assignment, var, neighbor)
-                ):
-                    ruleouts[val] += 1
+                for neighbor_val in self.domains[neighbor]:
+                    if not self.overlap_satisfied(var, neighbor, val, neighbor_val):
+                        ruleouts[val] += 1
 
         return sorted(ruleouts.keys(), key=lambda val: ruleouts[val])
 
@@ -266,7 +266,7 @@ class CrosswordCreator:
         """
 
         if self.assignment_complete(assignment):
-            assignment
+            return assignment
 
         # look for unassigned vars
         var = self.select_unassigned_variable(assignment)
@@ -278,7 +278,7 @@ class CrosswordCreator:
             if self.consistent(new_assignment):
                 orig_domains = self.domains
                 new_domains = deepcopy(self.domains)
-                new_domains[val] = {val}
+                new_domains[var] = {val}
 
                 # check if new domain is consistent
                 self.domains = new_domains
@@ -296,64 +296,26 @@ class CrosswordCreator:
 
 
 def main():
-    # Check usage
-    # if len(sys.argv) not in [3, 4]:
-    #     sys.exit("Usage: python generate.py structure words [output]")
-    #
-    # # Parse command-line arguments
-    # structure = sys.argv[1]
-    # words = sys.argv[2]
-    # output = sys.argv[3] if len(sys.argv) == 4 else None
-    #
-    # # Generate crossword
-    # crossword = Crossword(structure, words)
-    # creator = CrosswordCreator(crossword)
-    # assignment = creator.solve()
-    #
-    # # Print result
-    # if assignment is None:
-    #     print("No solution.")
-    # else:
-    #     creator.print(assignment)
-    #     if output:
-    #         creator.save(assignment, output)
+    if len(sys.argv) not in [3, 4]:
+        sys.exit("Usage: python generate.py structure words [output]")
 
-    crossword = Crossword("data/test_structure0.txt", "data/test_words1.txt")
+    # Parse command-line arguments
+    structure = sys.argv[1]
+    words = sys.argv[2]
+    output = sys.argv[3] if len(sys.argv) == 4 else None
+
+    # Generate crossword
+    crossword = Crossword(structure, words)
     creator = CrosswordCreator(crossword)
-    creator.domains = {
-        Variable(0, 1, "across", 5): {"TODAY", "READY", "HELLO", "AMAZE", "FORGE"},
-        Variable(0, 2, "down", 3): {"ODE", "ELM"},
-        Variable(2, 1, "across", 5): {"TODAY", "READY", "HELLO", "AMAZE", "FORGE"},
-    }
+    assignment = creator.solve()
 
-    creator.ac3(arcs=[])
-    expected = {
-        Variable(0, 1, "across", 5): {"TODAY", "READY", "HELLO", "AMAZE", "FORGE"},
-        Variable(0, 2, "down", 3): {"ODE", "ELM"},
-        Variable(2, 1, "across", 5): {"TODAY", "READY", "HELLO", "AMAZE", "FORGE"},
-    }
-    creator.ac3(arcs=[(Variable(0, 2, "down", 3), Variable(2, 1, "across", 5))])
-    for var in expected:
-        print(creator.domains[var])
-
-    # x = Variable(0, 1, "across", 5)
-    # y = Variable(0, 2, "down", 3)
-    # for i in range(crossword.height):
-    #     for j in range(crossword.width):
-    #         # if (i, j) == overlap:
-    #         #     print("o", end="")
-    #         if (i, j) in x.cells and (i, j) in y.cells:
-    #             print("@", end="")
-    #             overlap = i, j
-    #         elif (i, j) in x.cells:
-    #             print("x", end="")
-    #         elif (i, j) in y.cells:
-    #             print("y", end="")
-    #         else:
-    #             print("_", end="")
-    #     print("")
-    #
-    # print(f"{crossword.overlaps[x,y]=}")
+    # Print result
+    if assignment is None:
+        print("No solution.")
+    else:
+        creator.print(assignment)
+        if output:
+            creator.save(assignment, output)
 
 
 if __name__ == "__main__":
